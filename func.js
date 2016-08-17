@@ -35,7 +35,22 @@ function start(){
                     item[10], item[11], item[12], item[13], item[14], item[15], '', '', '', '', '']);
             }
 
-            saveToExcel(rows);
+            let promises = []
+            for(let item of rows){
+                promises.push(getDetailInfo(item[0]));
+            }
+
+            Promise.all(promises).then(datas => {
+                datas.forEach(item => {
+                    for(let row of rows){
+                        if(row[0] == item.code){
+                            row[18] = item.holder;
+                            row[19] = item.asset;
+                        }
+                    }
+                })
+                saveToExcel(rows);
+            }); 
         }
         else {
             console.log("error");
@@ -45,8 +60,6 @@ function start(){
 
 start();
 
-getDetailInfo('000011');
-
 //获取每只基金的数据
 function getDetailInfo(code){
     return new Promise(function(resolve, reject){        
@@ -55,12 +68,18 @@ function getDetailInfo(code){
         download(url, function(data){
             eval(data);
             //资产配置 Data_assetAllocation 
+            //持有人结构 Data_holderStructure
             let asset = '';
             for(let item of Data_assetAllocation.series){
                 asset += item.name + '=' + item.data.pop().toFixed(2) + '% ';
             }
-            console.log(asset);
 
+            let holder = '';
+            for(let item of Data_holderStructure.series){
+                holder += item.name + '=' + item.data.pop().toFixed(2) + '% ';
+            }
+            //console.log(asset);
+            resolve({code, asset, holder});
         })
     });
 }
@@ -97,8 +116,8 @@ function saveToExcel(rows) {
         { header: '基金规模', key: 'q', width: 10 },
         { header: '基金份额', key: 'r', width: 10 },
         { header: '四分位', key: 's', width: 10 },
-        { header: '持有人', key: 't', width: 10 },
-        { header: '资产配置', key: 'u', width: 10 }
+        { header: '持有人', key: 't', width: 30 },
+        { header: '资产配置', key: 'u', width: 30 }
     ];
 
     worksheet.addRows(rows);
