@@ -14,8 +14,6 @@ function download(url, callback) {
     });
 }
 
-//var cheerio = require("cheerio");
-
 //开始抓取数据
 function start(){
     let url = "http://fund.eastmoney.com/data/rankhandler.aspx?op=ph&dt=kf&ft=hh&rs=&gs=0&sc=lnzf&st=desc&sd=2015-08-16&ed=2016-08-16&qdii=&tabSubtype=,,,,,&pi=1&pn=3&dx=1&v=0.37704015895724297";
@@ -49,8 +47,24 @@ function start(){
                         }
                     }
                 })
-                saveToExcel(rows);
-            }); 
+
+                //再从页面里取一些数据，这里有点乱
+                let promise2 = [];
+                for(let item of rows){
+                    promise2.push(getPageInfo(item[0]));
+                }
+                Promise.all(promise2).then(datas => {
+                    datas.forEach(item => {
+                        for(let row of rows){
+                            if(row[0] == item.code){
+                                row[1] = item.result[1].slice(-10);
+                                row[15] = item.result[0].slice(5);
+                            }
+                        }                        
+                    });
+                    saveToExcel(rows);               
+                }); 
+            });
         }
         else {
             console.log("error");
@@ -79,9 +93,33 @@ function getDetailInfo(code){
             for(let item of Data_holderStructure.series){
                 holder += item.name.slice(0,2) + '=' + item.data.pop().toFixed(2) + '% ';
             }
-            //console.log(asset);
             resolve({code, asset, holder});
         })
+    });
+}
+
+//getPageInfo('000011');
+
+//抓取页面上的一些数据
+function getPageInfo(code){
+    let cheerio = require("cheerio");
+    return new Promise(function(resolve, reject){
+        let url = 'http://fund.eastmoney.com/' + code + '.html';
+        console.log(url);
+        download(url, function(data){
+            let $ = cheerio.load(data);
+
+            //取成立日 基金规模
+            let result = [];
+            $('.merchandiseDetail .infoOfFund table tr td').each(function(i, e){
+                var err = $(e);
+                if(i == 1 || i == 3){
+                    result.push(err.text());
+                }
+                resolve({code, result});                
+            });
+        })
+
     });
 }
 
