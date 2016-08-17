@@ -1,4 +1,5 @@
-var http = require("http");
+let http = require("http");
+let cheerio = require("cheerio");
 
 function download(url, callback) {
     http.get(url, function (res) {
@@ -62,7 +63,23 @@ function start(){
                             }
                         }                        
                     });
-                    saveToExcel(rows);               
+
+                    //再从页面里取一些数据，这里有点乱
+                    let promise3 = [];
+                    for(let item of rows){
+                        promise3.push(getPageInfo2(item[0]));
+                    }
+                    Promise.all(promise3).then(datas => {
+                        datas.forEach(item => {
+                            for(let row of rows){
+                                if(row[0] == item.code){
+                                    row[16] = item.ab;
+                                }
+                            }                        
+                        });
+
+                        saveToExcel(rows);               
+                    });            
                 }); 
             });
         }
@@ -72,7 +89,7 @@ function start(){
     });
 }
 
-start();
+//start();
 
 //获取每只基金的数据
 function getDetailInfo(code){
@@ -98,11 +115,8 @@ function getDetailInfo(code){
     });
 }
 
-//getPageInfo('000011');
-
 //抓取页面上的一些数据
 function getPageInfo(code){
-    let cheerio = require("cheerio");
     return new Promise(function(resolve, reject){
         let url = 'http://fund.eastmoney.com/' + code + '.html';
         console.log(url);
@@ -118,6 +132,49 @@ function getPageInfo(code){
                 }
                 resolve({code, result});                
             });
+        })
+
+    });
+}
+
+//getPageInfo2('000011');
+
+//抓取页面上的一些数据：份额规模
+function getPageInfo2(code){    
+    return new Promise(function(resolve, reject){
+        let url = 'http://fund.eastmoney.com/f10/jbgk_' + code + '.html';
+        console.log(url);
+        download(url, function(data){
+            let $ = cheerio.load(data);
+            $('.txt_cont table tr').each(function(i, e){
+                if(i == 3){
+                    //console.log($(e).text());
+                    var ab = $(e).find('a').text();
+                    resolve({code, ab});
+                }                
+            })
+        })
+
+    });
+}
+
+getPageInfo3('000011');
+
+//抓取四分位
+function getPageInfo3(code){    
+    return new Promise(function(resolve, reject){
+        let url = 'http://fund.eastmoney.com/f10/FundArchivesDatas.aspx?type=jdzf&code=' + code;
+        console.log(url);
+        download(url, function(data){
+            console.log(data);
+            let $ = cheerio.load(data);
+            // $('.txt_cont table tr').each(function(i, e){
+            //     if(i == 3){
+            //         //console.log($(e).text());
+            //         var ab = $(e).find('a').text();
+            //         resolve({code, ab});
+            //     }                
+            // })
         })
 
     });
