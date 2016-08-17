@@ -67,16 +67,17 @@ function getDetailInfo(code){
         console.log(url);
         download(url, function(data){
             eval(data);
-            //资产配置 Data_assetAllocation 
-            //持有人结构 Data_holderStructure
+            //资产配置 Data_assetAllocation            
             let asset = '';
             for(let item of Data_assetAllocation.series){
-                asset += item.name + '=' + item.data.pop().toFixed(2) + '% ';
+                asset += item.name.slice(0,2) + '=' + item.data.pop().toFixed(2) + '% ';
             }
+            asset = asset.slice(0, -2) + '亿元';
 
+            //持有人结构 Data_holderStructure
             let holder = '';
             for(let item of Data_holderStructure.series){
-                holder += item.name + '=' + item.data.pop().toFixed(2) + '% ';
+                holder += item.name.slice(0,2) + '=' + item.data.pop().toFixed(2) + '% ';
             }
             //console.log(asset);
             resolve({code, asset, holder});
