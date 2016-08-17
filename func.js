@@ -16,25 +16,57 @@ function download(url, callback) {
 
 //var cheerio = require("cheerio");
 
-var url = "http://fund.eastmoney.com/data/rankhandler.aspx?op=ph&dt=kf&ft=hh&rs=&gs=0&sc=lnzf&st=desc&sd=2015-08-16&ed=2016-08-16&qdii=&tabSubtype=,,,,,&pi=1&pn=3&dx=1&v=0.37704015895724297";
-download(url, function (data) {
-    if (data) {
-        eval(data);
-        let funds = rankData.datas;
-        let results = [];
-        for (let i = 0, len = funds.length; i < len; i++) {
-            let arr = funds[i].split(',');
-            results.push(arr);
+//开始抓取数据
+function start(){
+    let url = "http://fund.eastmoney.com/data/rankhandler.aspx?op=ph&dt=kf&ft=hh&rs=&gs=0&sc=lnzf&st=desc&sd=2015-08-16&ed=2016-08-16&qdii=&tabSubtype=,,,,,&pi=1&pn=3&dx=1&v=0.37704015895724297";
+    download(url, function (data) {
+        if (data) {
+            eval(data);
+            let funds = rankData.datas;
+            let results = [];
+            for (let i = 0, len = funds.length; i < len; i++) {
+                let arr = funds[i].split(',');
+                results.push(arr);
+            }
+
+            let rows = [];
+            for (let item of results) {
+                rows.push([item[0], '', item[1], item[4], item[5], item[6], item[7], item[8], item[9],
+                    item[10], item[11], item[12], item[13], item[14], item[15], '', '', '', '', '']);
+            }
+
+            saveToExcel(rows);
         }
-        saveToExcel(results);
-    }
-    else {
-        console.log("error");
-    }
-});
+        else {
+            console.log("error");
+        }
+    });
+}
+
+start();
+
+getDetailInfo('000011');
+
+//获取每只基金的数据
+function getDetailInfo(code){
+    return new Promise(function(resolve, reject){        
+        let url = 'http://fund.eastmoney.com/pingzhongdata/' + code + '.js';
+        console.log(url);
+        download(url, function(data){
+            eval(data);
+            //资产配置 Data_assetAllocation 
+            let asset = '';
+            for(let item of Data_assetAllocation.series){
+                asset += item.name + '=' + item.data.pop().toFixed(2) + '% ';
+            }
+            console.log(asset);
+
+        })
+    });
+}
 
 //保存到Excel
-function saveToExcel(datas) {
+function saveToExcel(rows) {
     var Excel = require('exceljs');
     var workbook = new Excel.Workbook();
     //一些属性
@@ -69,11 +101,6 @@ function saveToExcel(datas) {
         { header: '资产配置', key: 'u', width: 10 }
     ];
 
-    let rows = [];
-    for (let item of datas) {
-        rows.push([item[0], '', item[1], item[4], item[5], item[6], item[7], item[8], item[9],
-            item[10], item[11], item[12], item[13], item[14], item[15], '', '', '', '', '']);
-    }
     worksheet.addRows(rows);
 
     workbook.xlsx.writeFile("fund.xlsx")
