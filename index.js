@@ -2,39 +2,16 @@ let http = require("http");
 let cheerio = require("cheerio");
 let fetch = require("node-fetch");
 let moment = require("moment");
+let Excel = require('exceljs');
 
 start(50, moment().format('YYYY-MM-DD'));
 
-//开始抓取数据：各种增长率
-function start(pagesize, date) {
-    //这个url才是要用的，下面只是为了测试
-    // let url = 'http://fund.eastmoney.com/data/rankhandler.aspx?op=ph&dt=kf&ft=hh&rs=&gs=0&sc=lnzf&st=desc&sd='
-    //     + date + '&ed=' + date + '&qdii=&tabSubtype=,,,,,&pi=1&pn=' + pagesize + '&dx=1';
-    let url = 'http://fund.eastmoney.com/data/rankhandler.aspx?op=ph&dt=kf&ft=hh&rs=&gs=0&sc=jnzf&st=desc&sd='
-        + date + '&ed=' + date + '&qdii=&tabSubtype=,,,,,&pi=1&pn=' + pagesize + '&dx=1';
-    console.log(url);
-    //http://fund.eastmoney.com/data/rankhandler.aspx?op=ph&dt=kf&ft=hh&rs=&gs=0&sc=jnzf&st=desc
-    //&sd=2015-08-16&ed=2016-08-16&qdii=&tabSubtype=,,,,,&pi=1&pn=10000&dx=1&v=0.29055115463502434
-
-    fetch(url)
-        .then(function (res) {
-            return res.text();
-        }).then(function (data) {
-            if (data) {
-                eval(data);
-                let funds = rankData.datas;
-                let results = [];
-                for (let i = 0, len = funds.length; i < len; i++) {
-                    let arr = funds[i].split(',');
-                    results.push(arr);
-                }
-
-                let rows = [];
-                for (let item of results) {
-                    rows.push([item[0], '', item[1], item[4], item[5], item[6], item[7], item[8], item[9],
-                        item[10], item[11], item[12], item[13], item[14], item[15], '', '', '', '', '']);
-                }
-
+//开始抓取数据
+function start(pagesize, date){
+    getList(pagesize, date)//获取列表数据
+        .then(rows => {//获取资产配置和持有人机构
+            console.log()
+            return new Promise(function(resolve, reject){
                 let promises = []
                 for (let item of rows) {
                     promises.push(getDetailInfo(item[0]));
@@ -49,60 +26,100 @@ function start(pagesize, date) {
                             }
                         }
                     });
-
-                    //再从页面里取一些数据，这里有点乱 成立日 基金规模
-                    let promise2 = [];
-                    for (let item of rows) {
-                        promise2.push(getPageInfo(item[0]));
-                    }
-                    Promise.all(promise2).then(datas => {
-                        datas.forEach(item => {
-                            for (let row of rows) {
-                                if (row[0] == item.code) {
-                                    row[1] = item.result[1];
-                                    row[15] = item.result[0];
-                                }
+                    resolve(rows);
+                }).catch(err => reject(err));
+            });
+        }).then(rows => {//获取成立日和基金规模
+            return new Promise(function(resolve, reject){
+                let promise = [];
+                for (let item of rows) {
+                    promise.push(getPageInfo(item[0]));
+                }
+                Promise.all(promise).then(datas => {
+                    datas.forEach(item => {
+                        for (let row of rows) {
+                            if (row[0] == item.code) {
+                                row[1] = item.result[1];
+                                row[15] = item.result[0];
                             }
-                        });
-
-                        //再从页面里取一些数据，这里有点乱
-                        let promise3 = [];
-                        for (let item of rows) {
-                            promise3.push(getPageInfo2(item[0]));
                         }
-                        Promise.all(promise3).then(datas => {
-                            datas.forEach(item => {
-                                for (let row of rows) {
-                                    if (row[0] == item.code) {
-                                        row[16] = item.ab;
-                                    }
-                                }
-                            });
-
-                            //再从页面里取一些数据，这里有点乱
-                            let promise4 = [];
-                            for (let item of rows) {
-                                promise4.push(getPageInfo3(item[0]));
-                            }
-                            Promise.all(promise4).then(datas => {
-                                datas.forEach(item => {
-                                    for (let row of rows) {
-                                        if (row[0] == item.code) {
-                                            row[17] = item.num;
-                                        }
-                                    }
-                                });
-
-                                saveToExcel(rows);
-                            }).catch(err => console.error(err));
-                        }).catch(err => console.error(err));
                     });
-                }).catch(err => console.error(err));
-            }
-            else {
-                console.error("error");
-            }
+                    resolve(rows);
+                }).catch(err => reject(err));
+            });
+        }).then(rows => {//获取份额规模
+            return new Promise(function(resolve, reject){
+                let promise = [];
+                for (let item of rows) {
+                    promise.push(getPageInfo2(item[0]));
+                }
+                Promise.all(promise).then(datas => {
+                    datas.forEach(item => {
+                        for (let row of rows) {
+                            if (row[0] == item.code) {
+                                row[16] = item.ab;
+                            }
+                        }
+                    });
+                    resolve(rows);
+                }).catch(err => reject(err));
+            });
+        }).then(rows => {//获取四分位
+            return new Promise(function(resolve, reject){
+                let promise = [];
+                for (let item of rows) {
+                    promise.push(getPageInfo3(item[0]));
+                }
+                Promise.all(promise).then(datas => {
+                    datas.forEach(item => {
+                        for (let row of rows) {
+                            if (row[0] == item.code) {
+                                row[17] = item.num;
+                            }
+                        }
+                    });
+                    resolve(rows);
+                }).catch(err => reject(err));
+            });
+        }).then(rows => {//保存到Excel
+            saveToExcel(rows)
         }).catch(err => console.error(err));
+}
+
+//获取列表数据：各种增长率
+function getList(pagesize, date) {
+    return new Promise(function(resolve, reject){
+        //这个url才是要用的，下面只是为了测试
+        // let url = 'http://fund.eastmoney.com/data/rankhandler.aspx?op=ph&dt=kf&ft=hh&rs=&gs=0&sc=lnzf&st=desc&sd='
+        //     + date + '&ed=' + date + '&qdii=&tabSubtype=,,,,,&pi=1&pn=' + pagesize + '&dx=1';
+        let url = 'http://fund.eastmoney.com/data/rankhandler.aspx?op=ph&dt=kf&ft=hh&rs=&gs=0&sc=jnzf&st=desc&sd='
+            + date + '&ed=' + date + '&qdii=&tabSubtype=,,,,,&pi=1&pn=' + pagesize + '&dx=1';
+        console.log(url);
+        fetch(url)
+            .then(function (res) {
+                return res.text();
+            }).then(function (data) {
+                if (data) {
+                    eval(data);
+                    let funds = rankData.datas;
+                    let results = [];
+                    for (let i = 0, len = funds.length; i < len; i++) {
+                        let arr = funds[i].split(',');
+                        results.push(arr);
+                    }
+
+                    let rows = [];
+                    for (let item of results) {
+                        rows.push([item[0], '', item[1], item[4], item[5], item[6], item[7], item[8], item[9],
+                            item[10], item[11], item[12], item[13], item[14], item[15], '', '', '', '', '']);
+                    }
+                    resolve(rows);                
+                }
+                else {
+                    reject('no date');
+                }
+            }).catch(err => reject(err));
+    });
 }
 
 //getDetailInfo('040025');
@@ -128,7 +145,6 @@ function getDetailInfo(code) {
                 let holder = '';
                 if (Data_holderStructure.series.some(item => item.data.length > 0)) {
                     for (let item of Data_holderStructure.series) {
-                        //console.log(item);
                         holder += item.name.slice(0, 2) + '=' + ((item.data.length > 0) ? (item.data.pop().toFixed(2) + '% ') : '');
                     }
                 }
@@ -142,7 +158,7 @@ function getDetailInfo(code) {
 function getPageInfo(code) {
     return new Promise(function (resolve, reject) {
         let url = 'http://fund.eastmoney.com/' + code + '.html';
-        console.log('获取成立日和基金规模', url);
+        console.log(url);
         fetch(url)
             .then(function (res) {
                 return res.text();
@@ -211,12 +227,11 @@ function getPageInfo3(code) {
 }
 
 //保存到Excel
-function saveToExcel(rows) {
-    var Excel = require('exceljs');
+function saveToExcel(rows) {    
     var workbook = new Excel.Workbook();
     //一些属性
-    workbook.creator = 'cuijie';
-    workbook.lastModifiedBy = 'cuijie';
+    workbook.creator = 'noone';
+    workbook.lastModifiedBy = 'noone';
     workbook.created = new Date();
     workbook.modified = new Date();
 
