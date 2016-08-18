@@ -1,6 +1,7 @@
 let http = require("http");
 let cheerio = require("cheerio");
 let fetch = require("node-fetch");
+let moment = require("moment");
 
 function download(url, callback) {
     http.get(url, function (res) {
@@ -106,7 +107,7 @@ function start(pagesize) {
     });
 }
 
-start(10);
+start(2);
 
 //获取每只基金的数据
 function getDetailInfo(code) {
@@ -154,21 +155,22 @@ function getPageInfo(code) {
 
 //getPageInfo2('000011');
 
-//抓取页面上的一些数据：份额规模 有乱码
+//抓取页面上的一些数据：份额规模 http://fund.eastmoney.com/f10/jbgk_000011.html
 function getPageInfo2(code) {
     return new Promise(function (resolve, reject) {
         let url = 'http://fund.eastmoney.com/f10/jbgk_' + code + '.html';
-        console.log(url);
-        download(url, function (data) {
-            let $ = cheerio.load(data);
-            $('.txt_cont table tr').each(function (i, e) {
-                if (i == 3) {
-                    //console.log($(e).text());
-                    var ab = $(e).find('a').text();
-                    resolve({ code, ab });
-                }
-            })
-        });
+        fetch(url)
+            .then(function(res){
+                return res.text();
+            }).then(function(body){
+                let $ = cheerio.load(body);
+                $('.txt_cont table tr').each(function (i, e) {
+                    if (i == 3) {                        
+                        var ab = $(e).find('a').text();
+                        resolve({ code, ab });
+                    }
+                });
+            }).catch(err => reject(err));
     });
 }
 
@@ -232,8 +234,9 @@ function saveToExcel(rows) {
     ];
 
     worksheet.addRows(rows);
-
-    workbook.xlsx.writeFile("fund.xlsx")
+    
+    let filename = 'fund_' + moment().format('YYYY-MM-DD') + '.xlsx';
+    workbook.xlsx.writeFile(filename)
         .then(function () {
             // done
             console.log("it's done")
