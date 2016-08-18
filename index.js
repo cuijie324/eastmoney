@@ -8,9 +8,9 @@ function start(pagesize) {
     let url = 'http://fund.eastmoney.com/data/rankhandler.aspx?op=ph&dt=kf&ft=hh&rs=&gs=0&sc=lnzf&st=desc&sd=2015-08-16&ed=2016-08-16&qdii=&tabSubtype=,,,,,&pi=1&pn='
         + pagesize + '&dx=1';
     fetch(url)
-        .then(function(res){
+        .then(function (res) {
             return res.text();
-        }).then(function(data){
+        }).then(function (data) {
             if (data) {
                 eval(data);
                 let funds = rankData.datas;
@@ -96,7 +96,7 @@ function start(pagesize) {
         }).catch(err => console.error(err));
 }
 
-start(15);
+start(3);
 
 //获取每只基金的数据 http://fund.eastmoney.com/pingzhongdata/000011.js
 function getDetailInfo(code) {
@@ -113,7 +113,7 @@ function getDetailInfo(code) {
                 for (let item of Data_assetAllocation.series) {
                     asset += item.name.slice(0, 2) + '=' + item.data.pop().toFixed(2) + '% ';
                 }
-                asset = asset.slice(0, -2) + '亿元';
+                asset = asset.trim().slice(0, -1) + '亿元';
 
                 //持有人结构 Data_holderStructure
                 let holder = '';
