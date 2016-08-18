@@ -3,10 +3,16 @@ let cheerio = require("cheerio");
 let fetch = require("node-fetch");
 let moment = require("moment");
 
+start(10, moment().format('YYYY-MM-DD'));
+
 //开始抓取数据：各种增长率
-function start(pagesize) {
-    let url = 'http://fund.eastmoney.com/data/rankhandler.aspx?op=ph&dt=kf&ft=hh&rs=&gs=0&sc=lnzf&st=desc&sd=2015-08-16&ed=2016-08-16&qdii=&tabSubtype=,,,,,&pi=1&pn='
-        + pagesize + '&dx=1';
+function start(pagesize, date) {
+    let url = 'http://fund.eastmoney.com/data/rankhandler.aspx?op=ph&dt=kf&ft=hh&rs=&gs=0&sc=lnzf&st=desc&sd='
+        + date + '&ed=' + date + '&qdii=&tabSubtype=,,,,,&pi=1&pn=' + pagesize + '&dx=1';
+    console.log(url);
+    //http://fund.eastmoney.com/data/rankhandler.aspx?op=ph&dt=kf&ft=hh&rs=&gs=0&sc=jnzf&st=desc
+    //&sd=2015-08-16&ed=2016-08-16&qdii=&tabSubtype=,,,,,&pi=1&pn=10000&dx=1&v=0.29055115463502434
+
     fetch(url)
         .then(function (res) {
             return res.text();
@@ -39,7 +45,7 @@ function start(pagesize) {
                                 row[19] = item.asset;
                             }
                         }
-                    })
+                    });
 
                     //再从页面里取一些数据，这里有点乱 成立日 基金规模
                     let promise2 = [];
@@ -85,8 +91,8 @@ function start(pagesize) {
                                 });
 
                                 saveToExcel(rows);
-                            });
-                        });
+                            }).catch(err => console.log(err));
+                        }).catch(err => console.log(err));
                     });
                 }).catch(err => console.error(err));
             }
@@ -96,7 +102,7 @@ function start(pagesize) {
         }).catch(err => console.error(err));
 }
 
-start(3);
+//getDetailInfo('040025');
 
 //获取每只基金的数据 http://fund.eastmoney.com/pingzhongdata/000011.js
 function getDetailInfo(code) {
