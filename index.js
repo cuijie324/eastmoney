@@ -4,14 +4,14 @@ let fetch = require("node-fetch");
 let moment = require("moment");
 let Excel = require('exceljs');
 
-start(50, moment().format('YYYY-MM-DD'));
+start(1, 10000, moment().format('YYYY-MM-DD'));
 
 //开始抓取数据
-function start(pagesize, date){
-    getList(pagesize, date)//获取列表数据
-        .then(rows => {//获取资产配置和持有人机构
-            console.log()
-            return new Promise(function(resolve, reject){
+function start(pageindex, pagesize, date) {
+    getList(pageindex, pagesize, date)//获取列表数据
+        .then(rows => {//获取资产配置和持有人机构           
+            console.log("开始执行第二步》》》》》》》》");
+            return new Promise(function (resolve, reject) {
                 let promises = []
                 for (let item of rows) {
                     promises.push(getDetailInfo(item[0]));
@@ -30,7 +30,8 @@ function start(pagesize, date){
                 }).catch(err => reject(err));
             });
         }).then(rows => {//获取成立日和基金规模
-            return new Promise(function(resolve, reject){
+            console.log("开始执行第三步》》》》》》》》");
+            return new Promise(function (resolve, reject) {
                 let promise = [];
                 for (let item of rows) {
                     promise.push(getPageInfo(item[0]));
@@ -48,7 +49,8 @@ function start(pagesize, date){
                 }).catch(err => reject(err));
             });
         }).then(rows => {//获取份额规模
-            return new Promise(function(resolve, reject){
+            console.log("开始执行第四步》》》》》》》》");
+            return new Promise(function (resolve, reject) {
                 let promise = [];
                 for (let item of rows) {
                     promise.push(getPageInfo2(item[0]));
@@ -65,7 +67,8 @@ function start(pagesize, date){
                 }).catch(err => reject(err));
             });
         }).then(rows => {//获取四分位
-            return new Promise(function(resolve, reject){
+            console.log("开始执行第五步》》》》》》》》");
+            return new Promise(function (resolve, reject) {
                 let promise = [];
                 for (let item of rows) {
                     promise.push(getPageInfo3(item[0]));
@@ -82,18 +85,16 @@ function start(pagesize, date){
                 }).catch(err => reject(err));
             });
         }).then(rows => {//保存到Excel
+            console.log("开始保存数据》》》》》》》》");
             saveToExcel(rows)
         }).catch(err => console.error(err));
 }
 
 //获取列表数据：各种增长率
-function getList(pagesize, date) {
-    return new Promise(function(resolve, reject){
-        //这个url才是要用的，下面只是为了测试
-        // let url = 'http://fund.eastmoney.com/data/rankhandler.aspx?op=ph&dt=kf&ft=hh&rs=&gs=0&sc=lnzf&st=desc&sd='
-        //     + date + '&ed=' + date + '&qdii=&tabSubtype=,,,,,&pi=1&pn=' + pagesize + '&dx=1';
-        let url = 'http://fund.eastmoney.com/data/rankhandler.aspx?op=ph&dt=kf&ft=hh&rs=&gs=0&sc=jnzf&st=desc&sd='
-            + date + '&ed=' + date + '&qdii=&tabSubtype=,,,,,&pi=1&pn=' + pagesize + '&dx=1';
+function getList(pageindex, pagesize, date) {
+    return new Promise(function (resolve, reject) {
+        let url = 'http://fund.eastmoney.com/data/rankhandler.aspx?op=ph&dt=kf&ft=hh&rs=&gs=0&sc=lnzf&st=desc&sd='
+            + date + '&ed=' + date + '&qdii=&tabSubtype=,,,,,&pi=' + pageindex + '&pn=' + pagesize + '&dx=1';
         console.log(url);
         fetch(url)
             .then(function (res) {
@@ -113,7 +114,7 @@ function getList(pagesize, date) {
                         rows.push([item[0], '', item[1], item[4], item[5], item[6], item[7], item[8], item[9],
                             item[10], item[11], item[12], item[13], item[14], item[15], '', '', '', '', '']);
                     }
-                    resolve(rows);                
+                    resolve(rows);
                 }
                 else {
                     reject('no date');
@@ -136,11 +137,12 @@ function getDetailInfo(code) {
                 eval(data);
                 //资产配置 Data_assetAllocation            
                 let asset = '';
-                for (let item of Data_assetAllocation.series) {
-                    asset += item.name.slice(0, 2) + '=' + item.data.pop().toFixed(2) + '% ';
+                if (Data_assetAllocation.series.some(item => item.data.length > 0)) {
+                    for (let item of Data_assetAllocation.series) {
+                        asset += item.name.slice(0, 2) + '=' + ((item.data.length > 0) ? (item.data.pop().toFixed(2) + '% ') : '');
+                    }
+                    asset = asset.trim().slice(0, -1) + '亿元';
                 }
-                asset = asset.trim().slice(0, -1) + '亿元';
-
                 //持有人结构 Data_holderStructure
                 let holder = '';
                 if (Data_holderStructure.series.some(item => item.data.length > 0)) {
@@ -149,7 +151,6 @@ function getDetailInfo(code) {
                     }
                 }
                 resolve({ code, asset, holder });
-
             }).catch(err => reject(err));
     });
 }
@@ -227,15 +228,15 @@ function getPageInfo3(code) {
 }
 
 //保存到Excel
-function saveToExcel(rows) {    
-    var workbook = new Excel.Workbook();
+function saveToExcel(rows) {
+    let workbook = new Excel.Workbook();
     //一些属性
     workbook.creator = 'noone';
     workbook.lastModifiedBy = 'noone';
     workbook.created = new Date();
     workbook.modified = new Date();
 
-    var worksheet = workbook.addWorksheet('数据');
+    let worksheet = workbook.addWorksheet('数据');
 
     //定义列
     worksheet.columns = [
@@ -268,5 +269,5 @@ function saveToExcel(rows) {
         .then(function () {
             // done
             console.log("it's done")
-        });
+        }).catch(err => console.error(err));
 }
