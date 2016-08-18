@@ -61,8 +61,8 @@ function start(pagesize) {
                     datas.forEach(item => {
                         for (let row of rows) {
                             if (row[0] == item.code) {
-                                row[1] = item.result[1].slice(-10);
-                                row[15] = item.result[0].slice(5);
+                                row[1] = item.result[1];
+                                row[15] = item.result[0];
                             }
                         }
                     });
@@ -107,7 +107,7 @@ function start(pagesize) {
     });
 }
 
-start(2);
+start(10);
 
 //获取每只基金的数据
 function getDetailInfo(code) {
@@ -133,29 +133,36 @@ function getDetailInfo(code) {
     });
 }
 
-//抓取页面上的一些数据 成立日 基金规模
+//抓取页面数据：成立日、基金规模 http://fund.eastmoney.com/000011.html
 function getPageInfo(code) {
     return new Promise(function (resolve, reject) {
         let url = 'http://fund.eastmoney.com/' + code + '.html';
         console.log(url);
-        download(url, function (data) {
-            let $ = cheerio.load(data);
-            let result = [];
-            $('.merchandiseDetail .infoOfFund table tr td').each(function (i, e) {
-                var err = $(e);
-                if (i == 1 || i == 3) {
-                    result.push(err.text());
-                }
-                resolve({ code, result });
-            });
-        })
+        fetch(url)
+            .then(function(res){
+                return res.text();
+            }).then(function(body){
+                let $ = cheerio.load(body);
+                let result = [];
+                $('.merchandiseDetail .infoOfFund table tr td').each(function (i, e) {
+                    var err = $(e);
+                    if (i == 1) {
+                        result.push(err.text().trim().slice(5));
+                    } 
 
+                    if (i == 3) {
+                        result.push(err.text().trim().slice(-10));
+                    }                
+                });
+                console.log(result);
+                resolve({ code, result });
+            }).catch(err => reject(err));
     });
 }
 
 //getPageInfo2('000011');
 
-//抓取页面上的一些数据：份额规模 http://fund.eastmoney.com/f10/jbgk_000011.html
+//抓取页面数据：份额规模 http://fund.eastmoney.com/f10/jbgk_000011.html
 function getPageInfo2(code) {
     return new Promise(function (resolve, reject) {
         let url = 'http://fund.eastmoney.com/f10/jbgk_' + code + '.html';
@@ -176,7 +183,7 @@ function getPageInfo2(code) {
 
 //getPageInfo3('000011');
 
-//抓取四分位
+//抓取页面数据：四分位 http://fund.eastmoney.com/f10/FundArchivesDatas.aspx?type=jdzf&code=000011
 function getPageInfo3(code) {
     return new Promise(function (resolve, reject) {
         let url = 'http://fund.eastmoney.com/f10/FundArchivesDatas.aspx?type=jdzf&code=' + code;
