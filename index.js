@@ -1,5 +1,6 @@
 let http = require("http");
 let cheerio = require("cheerio");
+let fetch = require("node-fetch");
 
 function download(url, callback) {
     http.get(url, function (res) {
@@ -16,8 +17,9 @@ function download(url, callback) {
 }
 
 //开始抓取数据
-function start(){
-    let url = "http://fund.eastmoney.com/data/rankhandler.aspx?op=ph&dt=kf&ft=hh&rs=&gs=0&sc=lnzf&st=desc&sd=2015-08-16&ed=2016-08-16&qdii=&tabSubtype=,,,,,&pi=1&pn=3&dx=1&v=0.37704015895724297";
+function start(pagesize) {
+    let url = 'http://fund.eastmoney.com/data/rankhandler.aspx?op=ph&dt=kf&ft=hh&rs=&gs=0&sc=lnzf&st=desc&sd=2015-08-16&ed=2016-08-16&qdii=&tabSubtype=,,,,,&pi=1&pn='
+        + pagesize + '&dx=1&v=0.37704015895724297';
     download(url, function (data) {
         if (data) {
             eval(data);
@@ -35,52 +37,52 @@ function start(){
             }
 
             let promises = []
-            for(let item of rows){
+            for (let item of rows) {
                 promises.push(getDetailInfo(item[0]));
             }
 
             Promise.all(promises).then(datas => {
                 datas.forEach(item => {
-                    for(let row of rows){
-                        if(row[0] == item.code){
+                    for (let row of rows) {
+                        if (row[0] == item.code) {
                             row[18] = item.holder;
                             row[19] = item.asset;
                         }
                     }
                 })
 
-                //再从页面里取一些数据，这里有点乱
+                //再从页面里取一些数据，这里有点乱 成立日 基金规模
                 let promise2 = [];
-                for(let item of rows){
+                for (let item of rows) {
                     promise2.push(getPageInfo(item[0]));
                 }
                 Promise.all(promise2).then(datas => {
                     datas.forEach(item => {
-                        for(let row of rows){
-                            if(row[0] == item.code){
+                        for (let row of rows) {
+                            if (row[0] == item.code) {
                                 row[1] = item.result[1].slice(-10);
                                 row[15] = item.result[0].slice(5);
                             }
-                        }                        
+                        }
                     });
 
                     //再从页面里取一些数据，这里有点乱
                     let promise3 = [];
-                    for(let item of rows){
+                    for (let item of rows) {
                         promise3.push(getPageInfo2(item[0]));
                     }
                     Promise.all(promise3).then(datas => {
                         datas.forEach(item => {
-                            for(let row of rows){
-                                if(row[0] == item.code){
+                            for (let row of rows) {
+                                if (row[0] == item.code) {
                                     row[16] = item.ab;
                                 }
-                            }                        
+                            }
                         });
 
-                        saveToExcel(rows);               
-                    });            
-                }); 
+                        saveToExcel(rows);
+                    });
+                });
             });
         }
         else {
@@ -89,48 +91,46 @@ function start(){
     });
 }
 
-//start();
+//start(10);
 
 //获取每只基金的数据
-function getDetailInfo(code){
-    return new Promise(function(resolve, reject){        
+function getDetailInfo(code) {
+    return new Promise(function (resolve, reject) {
         let url = 'http://fund.eastmoney.com/pingzhongdata/' + code + '.js';
         console.log(url);
-        download(url, function(data){
+        download(url, function (data) {
             eval(data);
             //资产配置 Data_assetAllocation            
             let asset = '';
-            for(let item of Data_assetAllocation.series){
-                asset += item.name.slice(0,2) + '=' + item.data.pop().toFixed(2) + '% ';
+            for (let item of Data_assetAllocation.series) {
+                asset += item.name.slice(0, 2) + '=' + item.data.pop().toFixed(2) + '% ';
             }
             asset = asset.slice(0, -2) + '亿元';
 
             //持有人结构 Data_holderStructure
             let holder = '';
-            for(let item of Data_holderStructure.series){
-                holder += item.name.slice(0,2) + '=' + item.data.pop().toFixed(2) + '% ';
+            for (let item of Data_holderStructure.series) {
+                holder += item.name.slice(0, 2) + '=' + item.data.pop().toFixed(2) + '% ';
             }
-            resolve({code, asset, holder});
+            resolve({ code, asset, holder });
         })
     });
 }
 
-//抓取页面上的一些数据
-function getPageInfo(code){
-    return new Promise(function(resolve, reject){
+//抓取页面上的一些数据 成立日 基金规模
+function getPageInfo(code) {
+    return new Promise(function (resolve, reject) {
         let url = 'http://fund.eastmoney.com/' + code + '.html';
         console.log(url);
-        download(url, function(data){
+        download(url, function (data) {
             let $ = cheerio.load(data);
-
-            //取成立日 基金规模
             let result = [];
-            $('.merchandiseDetail .infoOfFund table tr td').each(function(i, e){
+            $('.merchandiseDetail .infoOfFund table tr td').each(function (i, e) {
                 var err = $(e);
-                if(i == 1 || i == 3){
+                if (i == 1 || i == 3) {
                     result.push(err.text());
                 }
-                resolve({code, result});                
+                resolve({ code, result });
             });
         })
 
@@ -139,44 +139,44 @@ function getPageInfo(code){
 
 //getPageInfo2('000011');
 
-//抓取页面上的一些数据：份额规模
-function getPageInfo2(code){    
-    return new Promise(function(resolve, reject){
+//抓取页面上的一些数据：份额规模 有乱码
+function getPageInfo2(code) {
+    return new Promise(function (resolve, reject) {
         let url = 'http://fund.eastmoney.com/f10/jbgk_' + code + '.html';
         console.log(url);
-        download(url, function(data){
+        download(url, function (data) {
             let $ = cheerio.load(data);
-            $('.txt_cont table tr').each(function(i, e){
-                if(i == 3){
+            $('.txt_cont table tr').each(function (i, e) {
+                if (i == 3) {
                     //console.log($(e).text());
                     var ab = $(e).find('a').text();
-                    resolve({code, ab});
-                }                
+                    resolve({ code, ab });
+                }
             })
-        })
-
+        });
     });
 }
 
 getPageInfo3('000011');
 
 //抓取四分位
-function getPageInfo3(code){    
-    return new Promise(function(resolve, reject){
+function getPageInfo3(code) {
+    return new Promise(function (resolve, reject) {
         let url = 'http://fund.eastmoney.com/f10/FundArchivesDatas.aspx?type=jdzf&code=' + code;
-        console.log(url);
-        download(url, function(data){
-            console.log(data);
-            let $ = cheerio.load(data);
-            // $('.txt_cont table tr').each(function(i, e){
-            //     if(i == 3){
-            //         //console.log($(e).text());
-            //         var ab = $(e).find('a').text();
-            //         resolve({code, ab});
-            //     }                
-            // })
-        })
-
+		fetch(url)
+            .then(function(res) {
+                return res.text();
+            }).then(function(body) {
+                eval(body);
+                let num = 0;
+                let $ = cheerio.load(apidata.content);                
+                $('li.sf').each(function(i, e){
+                    if($(e).text().trim() == '优秀'){
+                        num++;
+                    }                    
+                });
+                resolve(num);
+            }).catch(e => resolve(err));
     });
 }
 
