@@ -3,7 +3,7 @@ let cheerio = require("cheerio");
 let fetch = require("node-fetch");
 let moment = require("moment");
 
-start(20, moment().format('YYYY-MM-DD'));
+start(50, moment().format('YYYY-MM-DD'));
 
 //开始抓取数据：各种增长率
 function start(pagesize, date) {
@@ -94,20 +94,20 @@ function start(pagesize, date) {
                                 });
 
                                 saveToExcel(rows);
-                            }).catch(err => console.log(err));
-                        }).catch(err => console.log(err));
+                            }).catch(err => console.error(err));
+                        }).catch(err => console.error(err));
                     });
                 }).catch(err => console.error(err));
             }
             else {
-                console.log("error");
+                console.error("error");
             }
         }).catch(err => console.error(err));
 }
 
 //getDetailInfo('040025');
 
-//获取每只基金的数据 http://fund.eastmoney.com/pingzhongdata/000011.js
+//获取每只基金的资产配置和持有人机构 http://fund.eastmoney.com/pingzhongdata/000011.js
 function getDetailInfo(code) {
     return new Promise(function (resolve, reject) {
         let url = 'http://fund.eastmoney.com/pingzhongdata/' + code + '.js';
@@ -126,11 +126,11 @@ function getDetailInfo(code) {
 
                 //持有人结构 Data_holderStructure
                 let holder = '';
-                if(Data_holderStructure.series.some(item => item.data.length > 0)){
+                if (Data_holderStructure.series.some(item => item.data.length > 0)) {
                     for (let item of Data_holderStructure.series) {
-                        console.log(item);
-                        holder += item.name.slice(0, 2) + '=' + ((item.data.length > 0) ? (item.data.pop().toFixed(2) + '% '): '');
-                    }                
+                        //console.log(item);
+                        holder += item.name.slice(0, 2) + '=' + ((item.data.length > 0) ? (item.data.pop().toFixed(2) + '% ') : '');
+                    }
                 }
                 resolve({ code, asset, holder });
 
@@ -142,7 +142,7 @@ function getDetailInfo(code) {
 function getPageInfo(code) {
     return new Promise(function (resolve, reject) {
         let url = 'http://fund.eastmoney.com/' + code + '.html';
-        console.log(url);
+        console.log('获取成立日和基金规模', url);
         fetch(url)
             .then(function (res) {
                 return res.text();
@@ -159,7 +159,6 @@ function getPageInfo(code) {
                         result.push(err.text().trim().slice(-10));
                     }
                 });
-                console.log(result);
                 resolve({ code, result });
             }).catch(err => reject(err));
     });
@@ -171,6 +170,7 @@ function getPageInfo(code) {
 function getPageInfo2(code) {
     return new Promise(function (resolve, reject) {
         let url = 'http://fund.eastmoney.com/f10/jbgk_' + code + '.html';
+        console.log(url);
         fetch(url)
             .then(function (res) {
                 return res.text();
@@ -192,6 +192,7 @@ function getPageInfo2(code) {
 function getPageInfo3(code) {
     return new Promise(function (resolve, reject) {
         let url = 'http://fund.eastmoney.com/f10/FundArchivesDatas.aspx?type=jdzf&code=' + code;
+        console.log(url);
         fetch(url)
             .then(function (res) {
                 return res.text();
