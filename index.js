@@ -3,11 +3,14 @@ let cheerio = require("cheerio");
 let fetch = require("node-fetch");
 let moment = require("moment");
 
-start(10, moment().format('YYYY-MM-DD'));
+start(20, moment().format('YYYY-MM-DD'));
 
 //开始抓取数据：各种增长率
 function start(pagesize, date) {
-    let url = 'http://fund.eastmoney.com/data/rankhandler.aspx?op=ph&dt=kf&ft=hh&rs=&gs=0&sc=lnzf&st=desc&sd='
+    //这个url才是要用的，下面只是为了测试
+    // let url = 'http://fund.eastmoney.com/data/rankhandler.aspx?op=ph&dt=kf&ft=hh&rs=&gs=0&sc=lnzf&st=desc&sd='
+    //     + date + '&ed=' + date + '&qdii=&tabSubtype=,,,,,&pi=1&pn=' + pagesize + '&dx=1';
+    let url = 'http://fund.eastmoney.com/data/rankhandler.aspx?op=ph&dt=kf&ft=hh&rs=&gs=0&sc=jnzf&st=desc&sd='
         + date + '&ed=' + date + '&qdii=&tabSubtype=,,,,,&pi=1&pn=' + pagesize + '&dx=1';
     console.log(url);
     //http://fund.eastmoney.com/data/rankhandler.aspx?op=ph&dt=kf&ft=hh&rs=&gs=0&sc=jnzf&st=desc
@@ -123,8 +126,11 @@ function getDetailInfo(code) {
 
                 //持有人结构 Data_holderStructure
                 let holder = '';
-                for (let item of Data_holderStructure.series) {
-                    holder += item.name.slice(0, 2) + '=' + item.data.pop().toFixed(2) + '% ';
+                if(Data_holderStructure.series.some(item => item.data.length > 0)){
+                    for (let item of Data_holderStructure.series) {
+                        console.log(item);
+                        holder += item.name.slice(0, 2) + '=' + ((item.data.length > 0) ? (item.data.pop().toFixed(2) + '% '): '');
+                    }                
                 }
                 resolve({ code, asset, holder });
 
