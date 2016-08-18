@@ -80,7 +80,22 @@ function start(pagesize) {
                             }
                         });
 
-                        saveToExcel(rows);
+                        //再从页面里取一些数据，这里有点乱
+                        let promise4 = [];
+                        for (let item of rows) {
+                            promise4.push(getPageInfo3(item[0]));
+                        }
+                        Promise.all(promise4).then(datas => {
+                            datas.forEach(item => {
+                                for (let row of rows) {
+                                    if (row[0] == item.code) {
+                                        row[17] = item.num;
+                                    }
+                                }
+                            });
+
+                            saveToExcel(rows);
+                        });
                     });
                 });
             });
@@ -91,7 +106,7 @@ function start(pagesize) {
     });
 }
 
-//start(10);
+start(10);
 
 //获取每只基金的数据
 function getDetailInfo(code) {
@@ -157,7 +172,7 @@ function getPageInfo2(code) {
     });
 }
 
-getPageInfo3('000011');
+//getPageInfo3('000011');
 
 //抓取四分位
 function getPageInfo3(code) {
@@ -175,7 +190,7 @@ function getPageInfo3(code) {
                         num++;
                     }                    
                 });
-                resolve(num);
+                resolve({code, num});
             }).catch(e => resolve(err));
     });
 }
