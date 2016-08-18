@@ -4,11 +4,48 @@ let fetch = require("node-fetch");
 let moment = require("moment");
 let Excel = require('exceljs');
 
-start(1, 10000, moment().format('YYYY-MM-DD'));
+start(1, 100, moment().format('YYYY-MM-DD'));
 
 //开始抓取数据
 function start(pageindex, pagesize, date) {
     getList(pageindex, pagesize, date)//获取列表数据
+        .then(rows => {
+            return new Promise(function(resolve, reject){
+                console.log("length>>>", rows.length);
+                let newRows = []
+                function recrute(rows){
+                    let data = rows.shift();
+                    processRows([data])
+                        .then( res => {
+                            newRows.push(res[0]);
+                            if(rows.length > 0){
+                                recrute(rows);
+                            }else{
+                                resolve(newRows);
+                            }
+                        });
+                }
+
+                recrute(rows);
+            });
+        })
+        .then(rows => {//保存到Excel
+            console.log("开始保存数据》》》》》》》》");
+            saveToExcel(rows);
+        }).catch(err => console.error(err));
+}
+
+//这个没什么用，不知道怎么写了
+function temp(rows){
+    return new Promise(function(resolve, reject){
+        resolve(rows);
+    });
+}
+
+//处理几行数据
+function processRows(rows){
+    return new Promise(function(resolve, reject){
+        temp(rows)
         .then(rows => {//获取资产配置和持有人机构           
             console.log("开始执行第二步》》》》》》》》");
             return new Promise(function (resolve, reject) {
@@ -84,10 +121,9 @@ function start(pageindex, pagesize, date) {
                     resolve(rows);
                 }).catch(err => reject(err));
             });
-        }).then(rows => {//保存到Excel
-            console.log("开始保存数据》》》》》》》》");
-            saveToExcel(rows)
-        }).catch(err => console.error(err));
+        }).then(rows => resolve(rows))
+        .catch(err => reject(err));
+    });
 }
 
 //获取列表数据：各种增长率
