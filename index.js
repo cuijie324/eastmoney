@@ -4,7 +4,7 @@ let fetch = require("node-fetch");
 let moment = require("moment");
 let Excel = require('exceljs');
 
-start(1, 10000, moment().format('YYYY-MM-DD'));
+start(1, 10, moment().format('YYYY-MM-DD'));
 
 //开始抓取数据
 function start(pageindex, pagesize, date) {
@@ -13,44 +13,46 @@ function start(pageindex, pagesize, date) {
         .then(processRows)//处理所有行
         .then(rows => {//保存到Excel
             let end = new moment();
+
             console.log("\n抓取完成，共花费时间: " + end.from(start));
-            console.log("开始保存数据》》》》》》》》");
+            console.log("\n开始保存数据》》》》》》》》");
             saveToExcel(rows);
         }).catch(err => console.error(err));
 }
 
-function processRows(datas){
-    return new Promise(function(resolve, reject){
+function processRows(datas) {
+    return new Promise(function (resolve, reject) {
         let result = [];
-        let steps = 2; 
-        let index = 0;       
+        let steps = 3;
+        let index = 0;
 
-        function recrute(rows, step){
-            console.log("\n开始第" + (++index) + "次抓取");
-            
+        console.log("\n总共" + datas.length + "条数据需要抓取，每次抓取" + steps + "数据");
+
+        function recrute(rows, step) {
+            console.log("\n开始第" + (++index) + "次抓取，还剩" + rows.length + "条数据");
             let promises = []
-            if(rows.length > step){
-                while(step > 0){
+            if (rows.length > step) {
+                while (step > 0) {
                     let row = rows.shift();
                     promises.push(processOneRow(row));
                     step--;
-                }            
-            }else{
+                }
+            } else {
                 promises = promises.concat(rows.map(processOneRow));
                 rows = [];
-            }        
+            }
 
             Promise.all(promises).then(res => {
                 result = result.concat(res);
-                if(rows.length > 0){
+                if (rows.length > 0) {
                     recrute(rows, steps);
-                }else{
+                } else {
                     resolve(result);
-                }                
+                }
             }).catch(err => {
                 console.error(err);
                 resolve(rows);
-            });                    
+            });
         };
 
         recrute(datas, steps);
@@ -61,8 +63,8 @@ function processRows(datas){
 // processOneRow(row);
 
 //处理一行数据
-function processOneRow(row){
-    return new Promise(function(resolve, reject){
+function processOneRow(row) {
+    return new Promise(function (resolve, reject) {
         console.log("处理数据>>>>>", row[0]);
         getDetailInfo(row)//获取资产配置和持有人机构 
             .then(getPageInfo)//获取成立日和基金规模
@@ -89,17 +91,13 @@ function getList(pageindex, pagesize, date) {
                 if (data) {
                     eval(data);
                     let funds = rankData.datas;
-                    let results = [];
-                    for (let i = 0, len = funds.length; i < len; i++) {
-                        let arr = funds[i].split(',');
-                        results.push(arr);
-                    }
-
                     let rows = [];
-                    for (let item of results) {
+                    for (let i = 0, len = funds.length; i < len; i++) {
+                        let item = funds[i].split(',');
                         rows.push([item[0], '', item[1], item[4], item[5], item[6], item[7], item[8], item[9],
                             item[10], item[11], item[12], item[13], item[14], item[15], '', '', '', '', '']);
                     }
+
                     resolve(rows);
                 }
                 else {
@@ -139,7 +137,7 @@ function getDetailInfo(row) {
                         holder += item.name.slice(0, 2) + '=' + ((item.data.length > 0) ? (item.data.pop().toFixed(2) + '% ') : '');
                     }
                 }
-                row[18] = holder;                
+                row[18] = holder;
                 resolve(row);
             }).catch(err => reject(err));
     });
@@ -148,7 +146,7 @@ function getDetailInfo(row) {
 //getPageInfo('550003');
 
 //抓取页面数据：成立日、基金规模 http://fund.eastmoney.com/000011.html
-function getPageInfo(row) {    
+function getPageInfo(row) {
     return new Promise(function (resolve, reject) {
         let code = row[0];
         let url = 'http://fund.eastmoney.com/' + code + '.html';
