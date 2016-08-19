@@ -6,20 +6,20 @@ let Excel = require('exceljs');
 
 start(1, 10, moment().format('YYYY-MM-DD'));
 
-//开始抓取数据
+//抓取数据
 function start(pageindex, pagesize, date) {
     let start = new moment();
     getList(pageindex, pagesize, date)//获取列表数据
         .then(processRows)//处理所有行
         .then(rows => {//保存到Excel
             let end = new moment();
-
             console.log("\n抓取完成，共花费时间: " + end.from(start));
             console.log("\n开始保存数据》》》》》》》》");
             saveToExcel(rows);
         }).catch(err => console.error(err));
 }
 
+//处理所有数据行
 function processRows(datas) {
     return new Promise(function (resolve, reject) {
         let result = [];
@@ -81,8 +81,8 @@ function processOneRow(row) {
 //获取列表数据：各种增长率
 function getList(pageindex, pagesize, date) {
     return new Promise(function (resolve, reject) {
-        let url = 'http://fund.eastmoney.com/data/rankhandler.aspx?op=ph&dt=kf&ft=hh&rs=&gs=0&sc=lnzf&st=desc&sd='
-            + date + '&ed=' + date + '&qdii=&tabSubtype=,,,,,&pi=' + pageindex + '&pn=' + pagesize + '&dx=1';
+        let url = 'http://fund.eastmoney.com/data/rankhandler.aspx?op=ph&dt=kf&ft=hh&rs=&gs=0&sc=lnzf&st=desc'
+            + '&sd=' + date + '&ed=' + date + '&qdii=&tabSubtype=,,,,,&pi=' + pageindex + '&pn=' + pagesize + '&dx=1';
         //console.log(url);
         fetch(url)
             .then(function (res) {
@@ -156,7 +156,6 @@ function getPageInfo(row) {
                 return res.text();
             }).then(function (body) {
                 let $ = cheerio.load(body);
-                let result = [];
                 $('.merchandiseDetail .infoOfFund table tr td').each(function (i, e) {
                     var err = $(e);
                     if (i == 1) {
