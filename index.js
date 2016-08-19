@@ -4,125 +4,75 @@ let fetch = require("node-fetch");
 let moment = require("moment");
 let Excel = require('exceljs');
 
-start(1, 100, moment().format('YYYY-MM-DD'));
+start(1, 10000, moment().format('YYYY-MM-DD'));
 
 //开始抓取数据
 function start(pageindex, pagesize, date) {
+    let start = new moment();
     getList(pageindex, pagesize, date)//获取列表数据
-        .then(rows => {
-            return new Promise(function(resolve, reject){
-                console.log("length>>>", rows.length);
-                let newRows = []
-                function recrute(rows){
-                    let data = rows.shift();
-                    processRows([data])
-                        .then( res => {
-                            newRows.push(res[0]);
-                            if(rows.length > 0){
-                                recrute(rows);
-                            }else{
-                                resolve(newRows);
-                            }
-                        });
-                }
-
-                recrute(rows);
-            });
-        })
+        .then(processRows)//处理所有行
         .then(rows => {//保存到Excel
+            let end = new moment();
+            console.log("\n抓取完成，共花费时间: " + end.from(start));
             console.log("开始保存数据》》》》》》》》");
             saveToExcel(rows);
         }).catch(err => console.error(err));
 }
 
-//这个没什么用，不知道怎么写了
-function temp(rows){
+function processRows(datas){
     return new Promise(function(resolve, reject){
-        resolve(rows);
+        let result = [];
+        let steps = 2; 
+        let index = 0;       
+
+        function recrute(rows, step){
+            console.log("\n开始第" + (++index) + "次抓取");
+            
+            let promises = []
+            if(rows.length > step){
+                while(step > 0){
+                    let row = rows.shift();
+                    promises.push(processOneRow(row));
+                    step--;
+                }            
+            }else{
+                promises = promises.concat(rows.map(processOneRow));
+                rows = [];
+            }        
+
+            Promise.all(promises).then(res => {
+                result = result.concat(res);
+                if(rows.length > 0){
+                    recrute(rows, steps);
+                }else{
+                    resolve(result);
+                }                
+            }).catch(err => {
+                console.error(err);
+                resolve(rows);
+            });                    
+        };
+
+        recrute(datas, steps);
     });
 }
 
-//处理几行数据
-function processRows(rows){
-    return new Promise(function(resolve, reject){
-        temp(rows)
-        .then(rows => {//获取资产配置和持有人机构           
-            console.log("开始执行第二步》》》》》》》》");
-            return new Promise(function (resolve, reject) {
-                let promises = []
-                for (let item of rows) {
-                    promises.push(getDetailInfo(item[0]));
-                }
+// let row = ['000011'];
+// processOneRow(row);
 
-                Promise.all(promises).then(datas => {
-                    datas.forEach(item => {
-                        for (let row of rows) {
-                            if (row[0] == item.code) {
-                                row[18] = item.holder;
-                                row[19] = item.asset;
-                            }
-                        }
-                    });
-                    resolve(rows);
-                }).catch(err => reject(err));
+//处理一行数据
+function processOneRow(row){
+    return new Promise(function(resolve, reject){
+        console.log("处理数据>>>>>", row[0]);
+        getDetailInfo(row)//获取资产配置和持有人机构 
+            .then(getPageInfo)//获取成立日和基金规模
+            .then(getPageInfo2)//获取份额规模
+            .then(getPageInfo3)//获取四分位
+            .then(row => resolve(row))
+            .catch(err => {
+                console.error(err);
+                resolve(row);//返回原数据，不管错误
             });
-        }).then(rows => {//获取成立日和基金规模
-            console.log("开始执行第三步》》》》》》》》");
-            return new Promise(function (resolve, reject) {
-                let promise = [];
-                for (let item of rows) {
-                    promise.push(getPageInfo(item[0]));
-                }
-                Promise.all(promise).then(datas => {
-                    datas.forEach(item => {
-                        for (let row of rows) {
-                            if (row[0] == item.code) {
-                                row[1] = item.result[1];
-                                row[15] = item.result[0];
-                            }
-                        }
-                    });
-                    resolve(rows);
-                }).catch(err => reject(err));
-            });
-        }).then(rows => {//获取份额规模
-            console.log("开始执行第四步》》》》》》》》");
-            return new Promise(function (resolve, reject) {
-                let promise = [];
-                for (let item of rows) {
-                    promise.push(getPageInfo2(item[0]));
-                }
-                Promise.all(promise).then(datas => {
-                    datas.forEach(item => {
-                        for (let row of rows) {
-                            if (row[0] == item.code) {
-                                row[16] = item.ab;
-                            }
-                        }
-                    });
-                    resolve(rows);
-                }).catch(err => reject(err));
-            });
-        }).then(rows => {//获取四分位
-            console.log("开始执行第五步》》》》》》》》");
-            return new Promise(function (resolve, reject) {
-                let promise = [];
-                for (let item of rows) {
-                    promise.push(getPageInfo3(item[0]));
-                }
-                Promise.all(promise).then(datas => {
-                    datas.forEach(item => {
-                        for (let row of rows) {
-                            if (row[0] == item.code) {
-                                row[17] = item.num;
-                            }
-                        }
-                    });
-                    resolve(rows);
-                }).catch(err => reject(err));
-            });
-        }).then(rows => resolve(rows))
-        .catch(err => reject(err));
     });
 }
 
@@ -131,7 +81,7 @@ function getList(pageindex, pagesize, date) {
     return new Promise(function (resolve, reject) {
         let url = 'http://fund.eastmoney.com/data/rankhandler.aspx?op=ph&dt=kf&ft=hh&rs=&gs=0&sc=lnzf&st=desc&sd='
             + date + '&ed=' + date + '&qdii=&tabSubtype=,,,,,&pi=' + pageindex + '&pn=' + pagesize + '&dx=1';
-        console.log(url);
+        //console.log(url);
         fetch(url)
             .then(function (res) {
                 return res.text();
@@ -159,13 +109,14 @@ function getList(pageindex, pagesize, date) {
     });
 }
 
-//getDetailInfo('040025');
+//getDetailInfo('550003');
 
 //获取每只基金的资产配置和持有人机构 http://fund.eastmoney.com/pingzhongdata/000011.js
-function getDetailInfo(code) {
+function getDetailInfo(row) {
     return new Promise(function (resolve, reject) {
+        let code = row[0];
         let url = 'http://fund.eastmoney.com/pingzhongdata/' + code + '.js';
-        console.log(url);
+        //console.log(url);
         fetch(url)
             .then(function (res) {
                 return res.text();
@@ -179,6 +130,8 @@ function getDetailInfo(code) {
                     }
                     asset = asset.trim().slice(0, -1) + '亿元';
                 }
+                row[19] = asset;
+
                 //持有人结构 Data_holderStructure
                 let holder = '';
                 if (Data_holderStructure.series.some(item => item.data.length > 0)) {
@@ -186,16 +139,20 @@ function getDetailInfo(code) {
                         holder += item.name.slice(0, 2) + '=' + ((item.data.length > 0) ? (item.data.pop().toFixed(2) + '% ') : '');
                     }
                 }
-                resolve({ code, asset, holder });
+                row[18] = holder;                
+                resolve(row);
             }).catch(err => reject(err));
     });
 }
 
+//getPageInfo('550003');
+
 //抓取页面数据：成立日、基金规模 http://fund.eastmoney.com/000011.html
-function getPageInfo(code) {
+function getPageInfo(row) {    
     return new Promise(function (resolve, reject) {
+        let code = row[0];
         let url = 'http://fund.eastmoney.com/' + code + '.html';
-        console.log(url);
+        //console.log(url);
         fetch(url)
             .then(function (res) {
                 return res.text();
@@ -205,25 +162,26 @@ function getPageInfo(code) {
                 $('.merchandiseDetail .infoOfFund table tr td').each(function (i, e) {
                     var err = $(e);
                     if (i == 1) {
-                        result.push(err.text().trim().slice(5));
+                        row[15] = err.text().trim().slice(5);
                     }
 
                     if (i == 3) {
-                        result.push(err.text().trim().slice(-10));
+                        row[1] = err.text().trim().slice(-10);
                     }
                 });
-                resolve({ code, result });
+                resolve(row);
             }).catch(err => reject(err));
     });
 }
 
-//getPageInfo2('000011');
+//getPageInfo2('550003');
 
 //抓取页面数据：份额规模 http://fund.eastmoney.com/f10/jbgk_000011.html
-function getPageInfo2(code) {
+function getPageInfo2(row) {
     return new Promise(function (resolve, reject) {
+        let code = row[0];
         let url = 'http://fund.eastmoney.com/f10/jbgk_' + code + '.html';
-        console.log(url);
+        //console.log(url);
         fetch(url)
             .then(function (res) {
                 return res.text();
@@ -231,10 +189,10 @@ function getPageInfo2(code) {
                 let $ = cheerio.load(body);
                 $('.txt_cont table tr').each(function (i, e) {
                     if (i == 3) {
-                        var ab = $(e).find('a').text();
-                        resolve({ code, ab });
+                        row[16] = $(e).find('a').text();
                     }
                 });
+                resolve(row);
             }).catch(err => reject(err));
     });
 }
@@ -242,10 +200,11 @@ function getPageInfo2(code) {
 //getPageInfo3('000011');
 
 //抓取页面数据：四分位 http://fund.eastmoney.com/f10/FundArchivesDatas.aspx?type=jdzf&code=000011
-function getPageInfo3(code) {
+function getPageInfo3(row) {
     return new Promise(function (resolve, reject) {
+        let code = row[0];
         let url = 'http://fund.eastmoney.com/f10/FundArchivesDatas.aspx?type=jdzf&code=' + code;
-        console.log(url);
+        //console.log(url);
         fetch(url)
             .then(function (res) {
                 return res.text();
@@ -258,7 +217,8 @@ function getPageInfo3(code) {
                         num++;
                     }
                 });
-                resolve({ code, num });
+                row[17] = num;
+                resolve(row);
             }).catch(e => resolve(err));
     });
 }
@@ -267,8 +227,8 @@ function getPageInfo3(code) {
 function saveToExcel(rows) {
     let workbook = new Excel.Workbook();
     //一些属性
-    workbook.creator = 'noone';
-    workbook.lastModifiedBy = 'noone';
+    workbook.creator = 'eastmoney';
+    workbook.lastModifiedBy = 'eastmoney';
     workbook.created = new Date();
     workbook.modified = new Date();
 
