@@ -4,7 +4,7 @@ let fetch = require("node-fetch");
 let moment = require("moment");
 let Excel = require('exceljs');
 
-start(1, 10, moment().format('YYYY-MM-DD'));
+start(1, 10000, moment().format('YYYY-MM-DD'));
 
 //抓取数据
 function start(pageindex, pagesize, date) {
@@ -65,7 +65,7 @@ function processRows(datas) {
 //处理一行数据
 function processOneRow(row) {
     return new Promise(function (resolve, reject) {
-        console.log("处理数据>>>>>", row[0]);
+        //console.log("处理数据>>>>>", row[0]);
         getDetailInfo(row)//获取资产配置和持有人机构 
             .then(getPageInfo)//获取成立日和基金规模
             .then(getPageInfo2)//获取份额规模
